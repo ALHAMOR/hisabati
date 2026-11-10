@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="حساباتي">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#2563eb">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>حساباتي</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1c2330;--muted:#6b7585;--line:#e3e6ec;--accent:#2563eb;--danger:#d93025;--ok:#188038}
+@media (prefers-color-scheme:dark){:root{--bg:#10141b;--card:#1a202b;--text:#e8ecf3;--muted:#9aa4b5;--line:#2b3342;--accent:#5b8def;--danger:#f2706a;--ok:#4cc16c}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;line-height:1.5}
+.wrap{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:1.3rem;margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font:inherit}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:0}
+label{display:block;font-size:.85rem;color:var(--muted);margin:10px 0 4px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--text);padding:8px 14px;border-radius:10px}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button.danger{color:var(--danger)}
+button.small{padding:5px 10px;font-size:.85rem}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+.row>button{flex:none}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap}
+.bar{display:flex;gap:6px;flex-wrap:wrap}
+.hidden{display:none!important}
+.msg{font-size:.9rem;margin-top:8px;min-height:1.2em}
+.err{color:var(--danger)}
+.ok{color:var(--ok)}
+.tag{font-size:.75rem;background:var(--bg);border:1px solid var(--line);border-radius:20px;padding:1px 8px;color:var(--muted)}
+.item h3{margin:0 0 6px;font-size:1.05rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.field{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px dashed var(--line)}
+.field .k{color:var(--muted);font-size:.8rem;min-width:70px}
+.field .v{flex:1;word-break:break-all;direction:ltr;text-align:right;unicode-bidi:plaintext}
+.notes{color:var(--muted);font-size:.9rem;margin-top:6px;white-space:pre-wrap}
+.empty{text-align:center;color:var(--muted);padding:30px 0}
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--text);width:min(520px,94vw);padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.ltr{direction:ltr;text-align:left}
+.note{font-size:.8rem;color:var(--muted)}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+input,select,textarea{font-size:16px}
+button{touch-action:manipulation;min-height:36px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- شاشة الإنشاء / الفتح -->
+<div id="auth" class="card" style="margin-top:8vh">
+  <h1 id="authTitle">حساباتي</h1>
+  <p id="authDesc" class="note"></p>
+  <label for="mp">كلمة المرور الرئيسية</label>
+  <input id="mp" type="password" class="ltr" autocomplete="off">
+  <div id="confirmBox" class="hidden">
+    <label for="mp2">أعد كتابة كلمة المرور الرئيسية</label>
+    <input id="mp2" type="password" class="ltr" autocomplete="off">
+    <p class="note">⚠️ إذا نسيت هذه الكلمة فلا يمكن استرجاع بياناتك أبداً. اختر كلمة طويلة تحفظها جيداً.</p>
+  </div>
+  <div class="msg err" id="authMsg"></div>
+  <button id="authBtn" class="primary" style="width:100%;margin-top:8px"></button>
+</div>
+
+<!-- التطبيق -->
+<div id="app" class="hidden">
+  <div class="top">
+    <h1>🔐 حساباتي</h1>
+    <div class="bar">
+      <button id="addBtn" class="primary">+ إضافة حساب</button>
+      <button id="exportBtn" class="small">نسخة احتياطية</button>
+      <button id="importBtn" class="small">استيراد</button>
+      <button id="lockBtn" class="small">قفل</button>
+    </div>
+  </div>
+  <input id="search" placeholder="ابحث بالاسم أو اسم المستخدم أو البريد…" style="margin-bottom:12px">
+  <div id="list"></div>
+  <p class="note">البيانات مشفّرة (AES-256) ومحفوظة داخل هذا المتصفح فقط. يُقفل التطبيق تلقائياً بعد 5 دقائق من الخمول. خذ نسخة احتياطية بشكل دوري.</p>
+  <input type="file" id="file" accept=".json,application/json" class="hidden">
+</div>
+
+<!-- نافذة الإضافة/التعديل -->
+<dialog id="dlg">
+  <form id="form" method="dialog">
+    <h1 id="dlgTitle">حساب جديد</h1>
+    <label for="f_name">اسم الحساب / الموقع</label>
+    <input id="f_name" required placeholder="مثال: إنستغرام، Gmail">
+    <label for="f_cat">التصنيف</label>
+    <select id="f_cat">
+      <option>تواصل اجتماعي</option><option>بريد إلكتروني</option><option>بنوك ومال</option>
+      <option>عمل</option><option>تسوق</option><option>ترفيه</option><option>أخرى</option>
+    </select>
+    <label for="f_user">اسم المستخدم</label>
+    <input id="f_user" class="ltr" autocomplete="off">
+    <label for="f_email">البريد الإلكتروني</label>
+    <input id="f_email" type="text" class="ltr" autocomplete="off">
+    <label for="f_pass">كلمة السر</label>
+    <div class="row">
+      <input id="f_pass" type="password" class="ltr" autocomplete="off">
+      <button type="button" id="showPass" class="small">إظهار</button>
+      <button type="button" id="genPass" class="small">توليد</button>
+    </div>
+    <label for="f_notes">ملاحظات</label>
+    <textarea id="f_notes" rows="2"></textarea>
+    <div class="row" style="margin-top:14px">
+      <button type="submit" class="primary" id="saveBtn">حفظ</button>
+      <button type="button" id="cancelBtn">إلغاء</button>
+    </div>
+  </form>
+</dialog>
+
+</div>
+
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const enc=new TextEncoder(), dec=new TextDecoder();
+const KEY='hisabati_vault_v1';
+const ITER=310000;
+let cryptoKey=null, salt=null, items=[], editId=null, lockTimer=null;
+
+const b64=buf=>{let s='';new Uint8Array(buf).forEach(b=>s+=String.fromCharCode(b));return btoa(s)};
+const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+
+async function derive(pw,salt){
+  const base=await crypto.subtle.importKey('raw',enc.encode(pw),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:ITER,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function encryptItems(key,list){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc.encode(JSON.stringify(list)));
+  return {iv:b64(iv),ct:b64(ct)};
+}
+async function decryptItems(key,iv,ct){
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(iv)},key,unb64(ct));
+  return JSON.parse(dec.decode(pt));
+}
+async function persist(){
+  const {iv,ct}=await encryptItems(cryptoKey,items);
+  const blob={v:1,salt:b64(salt),iv,ct};
+  try{localStorage.setItem(KEY,JSON.stringify(blob))}catch(e){alert('تعذّر الحفظ في المتصفح. جرّب أخذ نسخة احتياطية.')}
+}
+const getStored=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}};
+
+/* ---------- الدخول ---------- */
+function showAuth(){
+  const stored=getStored();
+  $('app').classList.add('hidden');$('auth').classList.remove('hidden');
+  $('mp').value='';$('mp2').value='';$('authMsg').textContent='';
+  if(stored){
+    $('authDesc').textContent='أدخل كلمة المرور الرئيسية لفتح حساباتك.';
+    $('confirmBox').classList.add('hidden');$('authBtn').textContent='فتح';
+  }else{
+    $('authDesc').textContent='مرحباً! أنشئ كلمة مرور رئيسية لحماية بياناتك.';
+    $('confirmBox').classList.remove('hidden');$('authBtn').textContent='إنشاء';
+  }
+  $('mp').focus();
+}
+async function authSubmit(){
+  const pw=$('mp').value, stored=getStored(), msg=$('authMsg');
+  msg.textContent='';
+  try{
+    if(stored){
+      const s=unb64(stored.salt), k=await derive(pw,s);
+      items=await decryptItems(k,stored.iv,stored.ct);
+      cryptoKey=k;salt=s;
+    }else{
+      if(pw.length<8){msg.textContent='يجب ألا تقل عن 8 أحرف.';return}
+      if(pw!==$('mp2').value){msg.textContent='كلمتا المرور غير متطابقتين.';return}
+      salt=crypto.getRandomValues(new Uint8Array(16));
+      cryptoKey=await derive(pw,salt);items=[];await persist();
+    }
+  }catch(e){msg.textContent='كلمة المرور غير صحيحة.';return}
+  $('mp').value='';$('mp2').value='';
+  $('auth').classList.add('hidden');$('app').classList.remove('hidden');
+  render();resetLock();
+}
+$('authBtn').onclick=authSubmit;
+['mp','mp2'].forEach(i=>$(i).addEventListener('keydown',e=>{if(e.key==='Enter')authSubmit()}));
+
+function lock(){cryptoKey=null;items=[];$('list').textContent='';showAuth()}
+$('lockBtn').onclick=lock;
+function resetLock(){clearTimeout(lockTimer);if(cryptoKey)lockTimer=setTimeout(lock,5*60*1000)}
+['click','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,resetLock,{passive:true}));
+
+/* ---------- العرض ---------- */
+function el(tag,props={},...kids){
+  const e=document.createElement(tag);
+  for(const k in props){if(k==='class')e.className=props[k];else if(k.startsWith('on'))e[k]=props[k];else e.setAttribute(k,props[k])}
+  kids.flat().forEach(c=>e.append(c));return e;
+}
+async function copy(text,btn){
+  try{await navigator.clipboard.writeText(text)}catch(e){
+    const t=document.createElement('textarea');t.value=text;document.body.append(t);t.select();document.execCommand('copy');t.remove();
+  }
+  const old=btn.textContent;btn.textContent='تم ✓';setTimeout(()=>btn.textContent=old,1200);
+  setTimeout(()=>{navigator.clipboard&&navigator.clipboard.writeText('').catch(()=>{})},30000);
+}
+function field(label,value,secret){
+  if(!value)return null;
+  const v=el('span',{class:'v'},secret?'••••••••••':value);
+  let shown=false;
+  const row=el('div',{class:'field'},el('span',{class:'k'},label),v);
+  if(secret){
+    const t=el('button',{class:'small'},'إظهار');
+    t.onclick=()=>{shown=!shown;v.textContent=shown?value:'••••••••••';t.textContent=shown?'إخفاء':'إظهار'};
+    row.append(t);
+  }
+  const c=el('button',{class:'small'},'نسخ');c.onclick=()=>copy(value,c);row.append(c);
+  return row;
+}
+function render(){
+  const q=$('search').value.trim().toLowerCase(), list=$('list');
+  list.textContent='';
+  const shown=items.filter(i=>!q||[i.name,i.user,i.email,i.cat].some(x=>(x||'').toLowerCase().includes(q)))
+    .sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+  if(!shown.length){list.append(el('div',{class:'empty'},items.length?'لا توجد نتائج.':'لا توجد حسابات بعد. اضغط «إضافة حساب» للبدء.'));return}
+  shown.forEach(i=>{
+    const edit=el('button',{class:'small'},'تعديل');edit.onclick=()=>openDlg(i);
+    const del=el('button',{class:'small danger'},'حذف');
+    del.onclick=async()=>{if(confirm('حذف «'+i.name+'» نهائياً؟')){items=items.filter(x=>x.id!==i.id);await persist();render()}};
+    list.append(el('div',{class:'card item'},
+      el('h3',{},i.name,el('span',{class:'tag'},i.cat||'أخرى'),el('span',{style:'flex:1'}),edit,del),
+      field('المستخدم',i.user),field('البريد',i.email),field('كلمة السر',i.pass,true),
+      i.notes?el('div',{class:'notes'},i.notes):null));
+  });
+}
+$('search').oninput=render;
+
+/* ---------- الإضافة والتعديل ---------- */
+const dlg=$('dlg');
+function openDlg(item){
+  editId=item?item.id:null;
+  $('dlgTitle').textContent=item?'تعديل الحساب':'حساب جديد';
+  $('f_name').value=item?.name||'';$('f_cat').value=item?.cat||'تواصل اجتماعي';
+  $('f_user').value=item?.user||'';$('f_email').value=item?.email||'';
+  $('f_pass').value=item?.pass||'';$('f_pass').type='password';$('showPass').textContent='إظهار';
+  $('f_notes').value=item?.notes||'';
+  dlg.showModal();$('f_name').focus();
+}
+$('addBtn').onclick=()=>openDlg(null);
+$('cancelBtn').onclick=()=>dlg.close();
+$('showPass').onclick=()=>{const p=$('f_pass');const s=p.type==='password';p.type=s?'text':'password';$('showPass').textContent=s?'إخفاء':'إظهار'};
+$('genPass').onclick=()=>{
+  const set='abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*-_=+';
+  const r=crypto.getRandomValues(new Uint32Array(18));
+  $('f_pass').value=[...r].map(n=>set[n%set.length]).join('');
+  $('f_pass').type='text';$('showPass').textContent='إخفاء';
+};
+$('form').onsubmit=async e=>{
+  e.preventDefault();
+  const data={name:$('f_name').value.trim(),cat:$('f_cat').value,user:$('f_user').value.trim(),
+    email:$('f_email').value.trim(),pass:$('f_pass').value,notes:$('f_notes').value.trim()};
+  if(!data.name)return;
+  if(editId){items=items.map(i=>i.id===editId?{...i,...data}:i)}
+  else items.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),...data});
+  await persist();dlg.close();render();
+};
+
+/* ---------- نسخ احتياطي ---------- */
+$('exportBtn').onclick=()=>{
+  const stored=getStored();if(!stored)return;
+  const a=el('a',{href:URL.createObjectURL(new Blob([JSON.stringify(stored)],{type:'application/json'})),download:'hisabati-backup-'+new Date().toISOString().slice(0,10)+'.json'});
+  document.body.append(a);a.click();a.remove();
+};
+$('importBtn').onclick=()=>$('file').click();
+$('file').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const b=JSON.parse(await f.text());
+    const pw=prompt('أدخل كلمة المرور الرئيسية الخاصة بهذه النسخة:');if(pw===null)return;
+    const s=unb64(b.salt),k=await derive(pw,s),list=await decryptItems(k,b.iv,b.ct);
+    if(!confirm('سيتم استبدال الحسابات الحالية ('+items.length+') بحسابات النسخة ('+list.length+') وتصبح كلمة المرور الرئيسية هي كلمة النسخة. متابعة؟'))return;
+    cryptoKey=k;salt=s;items=list;await persist();render();
+  }catch(err){alert('تعذّر الاستيراد: الملف غير صالح أو كلمة المرور خاطئة.')}
+};
+
+showAuth();
+})();
+</script>
+<script>
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
+if(navigator.storage&&navigator.storage.persist){navigator.storage.persist().catch(()=>{})}
+</script>
+</body>
+</html>
