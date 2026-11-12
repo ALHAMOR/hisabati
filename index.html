@@ -47,6 +47,12 @@ dialog{border:1px solid var(--line);border-radius:16px;background:var(--card);co
 dialog::backdrop{background:rgba(0,0,0,.5)}
 .ltr{direction:ltr;text-align:left}
 .note{font-size:.8rem;color:var(--muted)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;margin-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border-radius:20px;padding:6px 14px;font-size:.9rem;white-space:nowrap}
+.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip b{font-weight:600;opacity:.75;margin-inline-start:6px;font-size:.8rem}
+.sec{font-size:.95rem;font-weight:600;color:var(--muted);margin:16px 2px 8px;display:flex;justify-content:space-between;cursor:pointer;user-select:none}
 body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
 input,select,textarea{font-size:16px}
 button{touch-action:manipulation;min-height:36px}
@@ -82,6 +88,7 @@ button{touch-action:manipulation;min-height:36px}
     </div>
   </div>
   <input id="search" placeholder="ابحث بالاسم أو اسم المستخدم أو البريد…" style="margin-bottom:12px">
+  <div id="chips" class="chips"></div>
   <div id="list"></div>
   <p class="note">البيانات مشفّرة (AES-256) ومحفوظة داخل هذا المتصفح فقط. يُقفل التطبيق تلقائياً بعد 5 دقائق من الخمول. خذ نسخة احتياطية بشكل دوري.</p>
   <input type="file" id="file" accept=".json,application/json" class="hidden">
@@ -186,7 +193,7 @@ async function authSubmit(){
 $('authBtn').onclick=authSubmit;
 ['mp','mp2'].forEach(i=>$(i).addEventListener('keydown',e=>{if(e.key==='Enter')authSubmit()}));
 
-function lock(){cryptoKey=null;items=[];$('list').textContent='';showAuth()}
+function lock(){cryptoKey=null;items=[];$('list').textContent='';$('chips').textContent='';showAuth()}
 $('lockBtn').onclick=lock;
 function resetLock(){clearTimeout(lockTimer);if(cryptoKey)lockTimer=setTimeout(lock,5*60*1000)}
 ['click','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,resetLock,{passive:true}));
@@ -195,7 +202,7 @@ function resetLock(){clearTimeout(lockTimer);if(cryptoKey)lockTimer=setTimeout(l
 function el(tag,props={},...kids){
   const e=document.createElement(tag);
   for(const k in props){if(k==='class')e.className=props[k];else if(k.startsWith('on'))e[k]=props[k];else e.setAttribute(k,props[k])}
-  kids.flat().forEach(c=>e.append(c));return e;
+  kids.flat().filter(c=>c!==null&&c!==undefined&&c!==false).forEach(c=>e.append(c));return e;
 }
 async function copy(text,btn){
   try{await navigator.clipboard.writeText(text)}catch(e){
@@ -217,30 +224,76 @@ function field(label,value,secret){
   const c=el('button',{class:'small'},'نسخ');c.onclick=()=>copy(value,c);row.append(c);
   return row;
 }
+const DEFAULT_CATS=['تواصل اجتماعي','بريد إلكتروني','بنوك ومال','عمل','تسوق','ترفيه','أخرى'];
+const ICONS={'تواصل اجتماعي':'💬','بريد إلكتروني':'✉️','بنوك ومال':'🏦','عمل':'💼','تسوق':'🛒','ترفيه':'🎬','أخرى':'📁'};
+const iconOf=c=>ICONS[c]||'🏷️';
+const catOf=i=>i.cat||'أخرى';
+let tab='all';try{tab=localStorage.getItem('hisabati_tab')||'all'}catch(e){}
+const collapsed=new Set();
+function allCats(){
+  const s=DEFAULT_CATS.slice(0,-1);
+  items.forEach(i=>{const c=catOf(i);if(c!=='أخرى'&&!s.includes(c))s.push(c)});
+  s.push('أخرى');return s;
+}
+function setTab(t){tab=t;try{localStorage.setItem('hisabati_tab',t)}catch(e){}render()}
+function card(i){
+  const edit=el('button',{class:'small'},'تعديل');edit.onclick=()=>openDlg(i);
+  const del=el('button',{class:'small danger'},'حذف');
+  del.onclick=async()=>{if(confirm('حذف «'+i.name+'» نهائياً؟')){items=items.filter(x=>x.id!==i.id);await persist();render()}};
+  return el('div',{class:'card item'},
+    el('h3',{},i.name,el('span',{style:'flex:1'}),edit,del),
+    field('المستخدم',i.user),field('البريد',i.email),field('كلمة السر',i.pass,true),
+    i.notes?el('div',{class:'notes'},i.notes):null);
+}
 function render(){
-  const q=$('search').value.trim().toLowerCase(), list=$('list');
-  list.textContent='';
-  const shown=items.filter(i=>!q||[i.name,i.user,i.email,i.cat].some(x=>(x||'').toLowerCase().includes(q)))
+  const q=$('search').value.trim().toLowerCase(), list=$('list'), chips=$('chips');
+  list.textContent='';chips.textContent='';
+  const matches=items.filter(i=>!q||[i.name,i.user,i.email,catOf(i)].some(x=>(x||'').toLowerCase().includes(q)))
     .sort((a,b)=>a.name.localeCompare(b.name,'ar'));
-  if(!shown.length){list.append(el('div',{class:'empty'},items.length?'لا توجد نتائج.':'لا توجد حسابات بعد. اضغط «إضافة حساب» للبدء.'));return}
-  shown.forEach(i=>{
-    const edit=el('button',{class:'small'},'تعديل');edit.onclick=()=>openDlg(i);
-    const del=el('button',{class:'small danger'},'حذف');
-    del.onclick=async()=>{if(confirm('حذف «'+i.name+'» نهائياً؟')){items=items.filter(x=>x.id!==i.id);await persist();render()}};
-    list.append(el('div',{class:'card item'},
-      el('h3',{},i.name,el('span',{class:'tag'},i.cat||'أخرى'),el('span',{style:'flex:1'}),edit,del),
-      field('المستخدم',i.user),field('البريد',i.email),field('كلمة السر',i.pass,true),
-      i.notes?el('div',{class:'notes'},i.notes):null));
+  if(!matches.length){list.append(el('div',{class:'empty'},items.length?'لا توجد نتائج.':'لا توجد حسابات بعد. اضغط «إضافة حساب» للبدء.'));return}
+  const cats=allCats().filter(c=>matches.some(i=>catOf(i)===c));
+  if(tab!=='all'&&!cats.includes(tab))tab='all';
+  const mk=(label,val,n)=>{
+    const b=el('button',{class:'chip'+(tab===val?' on':''),type:'button'},label,el('b',{},String(n)));
+    b.onclick=()=>setTab(val);return b;
+  };
+  chips.append(mk('الكل','all',matches.length));
+  cats.forEach(c=>chips.append(mk(iconOf(c)+' '+c,c,matches.filter(i=>catOf(i)===c).length)));
+  (tab==='all'?cats:[tab]).forEach(c=>{
+    const rows=matches.filter(i=>catOf(i)===c);
+    if(tab==='all'){
+      const open=!!q||!collapsed.has(c);
+      const h=el('div',{class:'sec'},el('span',{},iconOf(c)+' '+c+' ('+rows.length+')'),el('span',{},open?'▾':'◂'));
+      h.onclick=()=>{if(collapsed.has(c))collapsed.delete(c);else collapsed.add(c);render()};
+      list.append(h);
+      if(open)rows.forEach(i=>list.append(card(i)));
+    }else rows.forEach(i=>list.append(card(i)));
   });
 }
 $('search').oninput=render;
 
 /* ---------- الإضافة والتعديل ---------- */
 const dlg=$('dlg');
+let prevCat='';
+function fillCats(sel){
+  const cats=allCats();
+  if(sel&&!cats.includes(sel))cats.splice(cats.length-1,0,sel);
+  const f=$('f_cat');f.textContent='';
+  cats.forEach(c=>f.append(el('option',{value:c},c)));
+  f.append(el('option',{value:'__new'},'＋ قسم جديد…'));
+  f.value=sel;prevCat=sel;
+}
+$('f_cat').onchange=()=>{
+  const f=$('f_cat');
+  if(f.value==='__new'){
+    const n=(prompt('اسم القسم الجديد:')||'').trim().slice(0,30);
+    if(n)fillCats(n);else f.value=prevCat;
+  }else prevCat=f.value;
+};
 function openDlg(item){
   editId=item?item.id:null;
   $('dlgTitle').textContent=item?'تعديل الحساب':'حساب جديد';
-  $('f_name').value=item?.name||'';$('f_cat').value=item?.cat||'تواصل اجتماعي';
+  $('f_name').value=item?.name||'';fillCats(item?catOf(item):(tab!=='all'?tab:'تواصل اجتماعي'));
   $('f_user').value=item?.user||'';$('f_email').value=item?.email||'';
   $('f_pass').value=item?.pass||'';$('f_pass').type='password';$('showPass').textContent='إظهار';
   $('f_notes').value=item?.notes||'';
@@ -262,7 +315,7 @@ $('form').onsubmit=async e=>{
   if(!data.name)return;
   if(editId){items=items.map(i=>i.id===editId?{...i,...data}:i)}
   else items.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),...data});
-  await persist();dlg.close();render();
+  if(tab!=='all')tab=data.cat;await persist();dlg.close();render();
 };
 
 /* ---------- نسخ احتياطي ---------- */
